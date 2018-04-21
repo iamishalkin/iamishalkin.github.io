@@ -1,5 +1,6 @@
 ---
-title: "SPbR 11"
+title: "SPbR 11: Написание пользовательской функции с dplyr нотацией"
+author: "Иван Мишалкин"
 output: html_document
 ---
 
@@ -57,11 +58,11 @@ simple_function <- function(df, share_price, exchange_rate_to_usd, currency) {
 
 ```{r}
 df_test <- data.frame(
-    price = c(100, 200, 300),
-    dividend = c(15, 10, 30),
-    rate_to_usd = c(1, 1.25, 0.8),
-    rate_to_eur = c(0.8, 1, 1.55),
-    cur = c("USD", "EUR", "CAD")
+    price = c(100, 200, 300, 150, 550, 90),
+    dividend = c(15, 10, 30, 5, 70, 1),
+    rate_to_usd = c(1, 1.25, 0.8, 1, 1.25, 0.8),
+    rate_to_eur = c(0.8, 1, 1.55,0.8, 1, 1.55),
+    cur = c("USD", "EUR", "CAD", "USD", "EUR", "CAD")
 )
 simple_function(df_test, "price", "rate_to_usd", "cur")
 ```
@@ -73,6 +74,30 @@ simple_function(df_test, "price", "rate_to_usd", "cur")
 2. Сложно обобщить функцию, чтобы передавать в качестве аргументов неограниченное количество колонок для конвертации
 
 3. Не сохраняется стиль – нам приходится брать названия колонок в кавычки
+
+## Что получили/что хотим
+
+Допустим, нам необходимы только бумаги номинированные не в долларах и самые дорогие в каждой валюте. Тогда наш год выглядит так:
+
+```{r}
+df_test %>% 
+    filter(cur != "USD") %>% 
+    group_by(cur) %>% 
+    top_n(n = 1, wt = -price) %>% 
+    simple_function("price", "rate_to_usd", "cur") %>% 
+    ungroup()
+```
+
+А хотелось бы:
+
+```{r, eval=FALSE}
+df_test %>% 
+    filter(cur != "USD") %>% 
+    group_by(cur) %>% 
+    top_n(n = 1, wt = -price) %>% 
+    another_function(price, rate_to_usd, cur) %>% 
+    ungroup()
+```
 
 ## Некорректная реализация функции в dplyr
 
@@ -97,8 +122,9 @@ dplyr_function(df_test, price, rate_to_usd, cur)
 ```{r}
 se_dplyr_function <- function(df, share_price, exchange_rate_to_usd, currency) {
   df %>%
-    mutate_(share_price = glue::glue("{share_price} * {exchange_rate_to_usd}")) %>%
-    select_(share_price, currency)
+    mutate_("share_price" = glue::glue("{share_price} * {exchange_rate_to_usd}")) %>%
+    select_("share_price", currency) %>%
+    rename_(.dots = setNames("share_price", share_price))
 }
 se_dplyr_function(df_test, "price", "rate_to_usd", "cur")
 ```
